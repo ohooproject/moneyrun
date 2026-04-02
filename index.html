@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>복리 계산기 — 돈이 돈을 버는 원리</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --surface2: #1c1c26;
+      --border: rgba(255,255,255,0.07);
+      --accent: #c8f05a;
+      --accent2: #5af0b4;
+      --text: #f0f0f0;
+      --muted: #6b6b80;
+      --gold: #f0c55a;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans KR', sans-serif;
+      font-weight: 300;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE TEXTURE ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── GLOW ORBS ── */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .orb-1 { width: 600px; height: 600px; background: rgba(200,240,90,0.06); top: -200px; right: -100px; }
+    .orb-2 { width: 500px; height: 500px; background: rgba(90,240,180,0.05); bottom: 100px; left: -150px; }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
+      z-index: 1;
+      padding: 80px 40px 60px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .hero-eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.1s ease forwards;
+    }
+
+    .hero-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(72px, 12vw, 160px);
+      line-height: 0.9;
+      letter-spacing: -0.01em;
+      margin-bottom: 24px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.2s ease forwards;
+    }
+
+    .hero-title span { color: var(--accent); }
+
+    .hero-subtitle {
+      font-size: 16px;
+      color: var(--muted);
+      max-width: 480px;
+      line-height: 1.7;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.35s ease forwards;
+    }
+
+    /* ── MAIN LAYOUT ── */
+    .main {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 40px 80px;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    /* ── PANEL ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.5s ease forwards;
+    }
+
+    .panel-title {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    /* ── SLIDERS ── */
+    .field { margin-bottom: 28px; }
+
+    .field-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 10px;
+    }
+
+    .field-label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .field-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 2px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(200,240,90,0.15);
+      transition: box-shadow 0.2s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 0 8px rgba(200,240,90,0.2);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+    }
+
+    .range-track {
+      position: relative;
+    }
+
+    /* ── SELECT ── */
+    select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: 14px;
+      padding: 10px 14px;
+      cursor: pointer;
+      outline: none;
+      margin-top: 10px;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b80' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+
+    select:focus { border-color: rgba(200,240,90,0.4); }
+
+    /* ── RESULT CARDS ── */
+    .results {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-top: 28px;
+      padding-top: 28px;
+      border-top: 1px solid var(--border);
+    }
+
+    .result-card {
+      background: var(--surface2);
+      border-radius: 14px;
+      padding: 16px;
+      transition: transform 0.2s;
+    }
+
+    .result-card:hover { transform: translateY(-2px); }
+
+    .result-card.highlight {
+      background: transparent;
+      border: 1px solid rgba(200,240,90,0.25);
+      grid-column: 1 / -1;
+    }
+
+    .result-label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .result-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .result-card.highlight .result-num {
+      font-size: 28px;
+      color: var(--accent);
+    }
+
+    .result-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    /* ── RIGHT COLUMN ── */
+    .right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ── CHART PANEL ── */
+    .chart-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.65s ease forwards;
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .chart-title {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 260px;
+    }
+
+    /* ── INSIGHT PANEL ── */
+    .insight-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.8s ease forwards;
+    }
+
+    .insight-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .insight-card {
+      background: var(--surface2);
+      border-radius: 14px;
+      padding: 18px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .insight-card.alt { border-left-color: var(--accent2); }
+    .insight-card.gold { border-left-color: var(--gold); }
+
+    .insight-name {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .insight-val {
+      font-family: 'DM Mono', monospace;
+      font-size: 22px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .insight-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+    /* ── TIMELINE ── */
+    .timeline-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.95s ease forwards;
+    }
+
+    .timeline {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 60px 1fr 120px;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    .timeline-row:last-child { border-bottom: none; }
+
+    .timeline-year {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .timeline-bar-wrap {
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .timeline-bar {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      transition: width 0.4s ease;
+    }
+
+    .timeline-amount {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      text-align: right;
+      color: var(--text);
+    }
+
+    /* ── FORMULA STRIP ── */
+    .formula-strip {
+      background: var(--surface2);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .formula-label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .formula-text {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--accent);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 40px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ── KEYFRAMES ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .hero { padding: 60px 24px 40px; }
+      .main { grid-template-columns: 1fr; padding: 0 24px 60px; }
+      .results { grid-template-columns: 1fr 1fr; }
+      .result-card.highlight { grid-column: 1 / -1; }
+      .insight-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 500px) {
+      .hero-title { font-size: 72px; }
+      .legend { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <!-- HERO -->
+  <section class="hero">
+    <p class="hero-eyebrow">복리 계산기 · Compound Interest</p>
+    <h1 class="hero-title">돈이<br><span>돈을</span><br>번다</h1>
+    <p class="hero-subtitle">아인슈타인이 "세계 8번째 불가사의"라 불렀다는 복리. 슬라이더를 움직여 시간이 자산을 어떻게 키우는지 직접 확인하세요.</p>
+  </section>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- LEFT: CONTROLS -->
+    <div class="panel">
+      <p class="panel-title">// 투자 조건 설정</p>
+
+      <div class="field">
+        <div class="field-header">
+          <span class="field-label">초기 투자금</span>
+          <span class="field-value" id="lbl-principal">100만원</span>
+        </div>
+        <input type="range" id="inp-principal" min="100000" max="10000000" step="100000" value="1000000" />
+      </div>
+
+      <div class="field">
+        <div class="field-header">
+          <span class="field-label">연 수익률</span>
+          <span class="field-value" id="lbl-rate">7%</span>
+        </div>
+        <input type="range" id="inp-rate" min="1" max="20" step="1" value="7" />
+      </div>
+
+      <div class="field">
+        <div class="field-header">
+          <span class="field-label">투자 기간</span>
+          <span class="field-value" id="lbl-years">20년</span>
+        </div>
+        <input type="range" id="inp-years" min="1" max="40" step="1" value="20" />
+      </div>
+
+      <div class="field">
+        <span class="field-label">복리 적용 주기</span>
+        <select id="inp-freq">
+          <option value="1">연 1회</option>
+          <option value="12" selected>월 1회 (월복리)</option>
+          <option value="365">일 1회 (일복리)</option>
+        </select>
+      </div>
+
+      <!-- RESULTS -->
+      <div class="results">
+        <div class="result-card highlight">
+          <p class="result-label">최종 자산</p>
+          <p class="result-num" id="res-final">—</p>
+          <p class="result-sub" id="res-mult">—</p>
+        </div>
+        <div class="result-card">
+          <p class="result-label">총 수익</p>
+          <p class="result-num" id="res-gain" style="color: var(--accent2);">—</p>
+        </div>
+        <div class="result-card">
+          <p class="result-label">단리 대비 추가</p>
+          <p class="result-num" id="res-vs-simple" style="color: var(--gold);">—</p>
+        </div>
+        <div class="result-card">
+          <p class="result-label">연평균 실효수익률</p>
+          <p class="result-num" id="res-cagr">—</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right-col">
+
+      <!-- CHART -->
+      <div class="chart-panel">
+        <div class="chart-header">
+          <span class="chart-title">// 자산 성장 곡선</span>
+          <div class="legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#c8f05a;"></div>복리</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#5af0b4;"></div>이자분</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#6b6b80;"></div>단리</div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="main-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- INSIGHTS -->
+      <div class="insight-panel">
+        <p class="panel-title">// 핵심 인사이트</p>
+        <div class="insight-grid">
+          <div class="insight-card">
+            <p class="insight-name">72의 법칙</p>
+            <p class="insight-val" id="rule72">—</p>
+            <p class="insight-desc" id="rule72-desc">원금이 2배가 되는 데 걸리는 연수</p>
+          </div>
+          <div class="insight-card alt">
+            <p class="insight-name">복리 vs 단리</p>
+            <p class="insight-val" id="compound-bonus">—</p>
+            <p class="insight-desc">복리가 단리보다 더 벌어주는 금액</p>
+          </div>
+          <div class="insight-card gold">
+            <p class="insight-name">이자가 원금 초과 시점</p>
+            <p class="insight-val" id="crossover">—</p>
+            <p class="insight-desc">누적 이자가 원금보다 커지는 시점</p>
+          </div>
+          <div class="insight-card">
+            <p class="insight-name">10년 후 자산</p>
+            <p class="insight-val" id="yr10">—</p>
+            <p class="insight-desc">현재 설정 기준 10년 경과 시</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TIMELINE TABLE -->
+      <div class="timeline-panel">
+        <p class="panel-title">// 연도별 자산 추이</p>
+        <div class="formula-strip">
+          <span class="formula-label">공식</span>
+          <span class="formula-text" id="formula-display">A = P(1 + r/n)^(nt)</span>
+        </div>
+        <div class="timeline" id="timeline"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>복리 계산기 — 투자 결정에 앞서 전문 금융 상담을 권장합니다.</footer>
+
+  <script>
+    const fmt = v => {
+      if (v >= 1e8) return (v / 1e8).toFixed(2) + '억원';
+      if (v >= 1e4) return Math.round(v / 1e4) + '만원';
+      return Math.round(v).toLocaleString() + '원';
+    };
+    const fmtShort = v => {
+      if (v >= 1e8) return (v / 1e8).toFixed(1) + '억';
+      if (v >= 1e4) return Math.round(v / 1e4) + '만';
+      return Math.round(v).toLocaleString();
+    };
+
+    let chart;
+
+    function calc() {
+      const P = +document.getElementById('inp-principal').value;
+      const r = +document.getElementById('inp-rate').value / 100;
+      const Y = +document.getElementById('inp-years').value;
+      const n = +document.getElementById('inp-freq').value;
+
+      document.getElementById('lbl-principal').textContent = fmt(P);
+      document.getElementById('lbl-rate').textContent = document.getElementById('inp-rate').value + '%';
+      document.getElementById('lbl-years').textContent = Y + '년';
+
+      // Build data
+      const labels = [], compound = [], interest = [], simple = [];
+      for (let y = 0; y <= Y; y++) {
+        labels.push(y + '년');
+        const cv = P * Math.pow(1 + r / n, n * y);
+        compound.push(Math.round(cv));
+        interest.push(Math.round(cv - P));
+        simple.push(Math.round(P * (1 + r * y)));
+      }
+
+      const finalV = compound[Y];
+      const simpleV = simple[Y];
+      const gain = finalV - P;
+      const vsSimple = finalV - simpleV;
+
+      // Result cards
+      document.getElementById('res-final').textContent = fmt(finalV);
+      document.getElementById('res-mult').textContent = (finalV / P).toFixed(2) + '배 성장';
+      document.getElementById('res-gain').textContent = '+' + fmt(gain);
+      document.getElementById('res-vs-simple').textContent = '+' + fmt(vsSimple);
+      const cagr = (Math.pow(finalV / P, 1 / Y) - 1) * 100;
+      document.getElementById('res-cagr').textContent = cagr.toFixed(2) + '%';
+
+      // Insights
+      const doubleYears = Math.round(72 / (r * 100));
+      document.getElementById('rule72').textContent = doubleYears + '년';
+      document.getElementById('compound-bonus').textContent = '+' + fmt(vsSimple);
+
+      let crossoverYear = '—';
+      for (let y = 1; y <= Y; y++) {
+        const cv = P * Math.pow(1 + r / n, n * y);
+        if (cv - P >= P) { crossoverYear = y + '년차'; break; }
+      }
+      document.getElementById('crossover').textContent = crossoverYear;
+
+      const v10 = P * Math.pow(1 + r / n, n * Math.min(10, Y));
+      document.getElementById('yr10').textContent = fmt(Math.round(v10));
+
+      // Chart
+      if (chart) chart.destroy();
+      chart = new Chart(document.getElementById('main-chart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: '복리 원리금',
+              data: compound,
+              borderColor: '#c8f05a',
+              backgroundColor: 'rgba(200,240,90,0.06)',
+              fill: true,
+              tension: 0.35,
+              pointRadius: 0,
+              borderWidth: 2.5
+            },
+            {
+              label: '이자 수익',
+              data: interest,
+              borderColor: '#5af0b4',
+              backgroundColor: 'rgba(90,240,180,0.05)',
+              fill: true,
+              tension: 0.35,
+              pointRadius: 0,
+              borderWidth: 1.5
+            },
+            {
+              label: '단리',
+              data: simple,
+              borderColor: '#3a3a4a',
+              fill: false,
+              tension: 0,
+              pointRadius: 0,
+              borderWidth: 1.5,
+              borderDash: [5, 5]
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#13131a',
+              borderColor: 'rgba(255,255,255,0.08)',
+              borderWidth: 1,
+              titleColor: '#6b6b80',
+              bodyColor: '#f0f0f0',
+              padding: 12,
+              callbacks: {
+                label: ctx => '  ' + ctx.dataset.label + '  ' + fmt(ctx.raw)
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { font: { size: 10, family: 'DM Mono' }, color: '#3a3a4a', maxTicksLimit: 11, autoSkip: true },
+              grid: { color: 'rgba(255,255,255,0.03)' }
+            },
+            y: {
+              ticks: {
+                font: { size: 10, family: 'DM Mono' }, color: '#3a3a4a',
+                callback: v => fmtShort(v)
+              },
+              grid: { color: 'rgba(255,255,255,0.04)' }
+            }
+          }
+        }
+      });
+
+      // Timeline
+      const milestones = [];
+      const step = Math.max(1, Math.floor(Y / 8));
+      for (let y = step; y <= Y; y += step) milestones.push(y);
+      if (!milestones.includes(Y)) milestones.push(Y);
+
+      const maxVal = compound[Y];
+      const html = milestones.map(y => {
+        const v = compound[y];
+        const pct = Math.round((v / maxVal) * 100);
+        return `<div class="timeline-row">
+          <span class="timeline-year">${y}년</span>
+          <div class="timeline-bar-wrap"><div class="timeline-bar" style="width:${pct}%"></div></div>
+          <span class="timeline-amount">${fmt(v)}</span>
+        </div>`;
+      }).join('');
+      document.getElementById('timeline').innerHTML = html;
+    }
+
+    ['inp-principal','inp-rate','inp-years','inp-freq'].forEach(id => {
+      document.getElementById(id).addEventListener('input', calc);
+    });
+
+    calc();
+  </script>
+</body>
+</html>
